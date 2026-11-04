@@ -385,7 +385,11 @@ ifeq ($(COMP),clang)
 	CXX=clang++
 	CXXFLAGS += -pedantic -Wextra -Wshadow
 
-	ifneq ($(KERNEL),Darwin)
+	# Windows clang (MSYS2 CLANGARM64) has no libatomic. Link statically so the
+	# binary does not depend on MSYS2's runtime DLLs.
+	ifneq ($(findstring _NT,$(KERNEL)),)
+		LDFLAGS += -static
+	else ifneq ($(KERNEL),Darwin)
 	ifneq ($(KERNEL),OpenBSD)
 		LDFLAGS += -latomic
 	endif
