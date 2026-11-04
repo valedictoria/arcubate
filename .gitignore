@@ -1,0 +1,16 @@
+# Build output
+*.o
+*.gcda
+*.gcno
+.depend
+src/arcubate
+src/arcubate.exe
+src/stockfish
+tools/book_tool
+bench.txt
+
+# Local working folders, not part of the project
+archive/
+bookdata/
+match/
+nnue_src/

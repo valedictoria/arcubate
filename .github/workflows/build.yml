@@ -1,0 +1,82 @@
+# Builds every release target natively and checks the rules in Architecture.md.
+name: build
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  unix:
+    name: ${{ matrix.name }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { name: linux-x64, os: ubuntu-latest,    arch: x86-64-avx,     comp: gcc }
+          - { name: linux-amd, os: ubuntu-latest,    arch: x86-64-avx-amd, comp: gcc }
+          - { name: linux-arm, os: ubuntu-24.04-arm, arch: armv8,          comp: gcc }
+          - { name: macos-x64, os: macos-15-intel,   arch: x86-64-avx,     comp: clang }
+          - { name: macos-arm, os: macos-latest,     arch: apple-silicon,  comp: clang }
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - run: make -C src -j4 build ARCH=${{ matrix.arch }} COMP=${{ matrix.comp }}
+      - name: Bench signature at every SIMD level
+        run: tools/check_bench.sh src/arcubate
+      - name: Book move
+        if: hashFiles('src/arcubate.book') != ''
+        run: |
+          (printf 'position startpos\ngo movetime 100\n'; sleep 2; echo quit) | src/arcubate | tee out.txt
+          grep -q 'book move' out.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: arcubate-${{ matrix.name }}
+          path: |
+            src/arcubate
+            src/arcubate.book
+            Copying.txt
+            README.md
+
+  windows:
+    name: ${{ matrix.name }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { name: windows-x64, os: windows-latest, arch: x86-64-avx,     comp: mingw, msys: MINGW64,    pkg: mingw-w64-x86_64-gcc }
+          - { name: windows-amd, os: windows-latest, arch: x86-64-avx-amd, comp: mingw, msys: MINGW64,    pkg: mingw-w64-x86_64-gcc }
+          - { name: windows-arm, os: windows-11-arm, arch: armv8,          comp: clang, msys: CLANGARM64, pkg: mingw-w64-clang-aarch64-clang }
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: msys2 {0}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: ${{ matrix.msys }}
+          install: make ${{ matrix.pkg }}
+      - run: make -C src -j4 build ARCH=${{ matrix.arch }} COMP=${{ matrix.comp }}
+      - name: Bench signature at every SIMD level
+        run: tools/check_bench.sh src/arcubate
+      - name: Book move
+        if: hashFiles('src/arcubate.book') != ''
+        run: |
+          (printf 'position startpos\ngo movetime 100\n'; sleep 2; echo quit) | src/arcubate | tee out.txt
+          grep -q 'book move' out.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: arcubate-${{ matrix.name }}
+          path: |
+            src/arcubate*.exe
+            src/arcubate.book
+            Copying.txt
+            README.md
+
+  isa-audit:
+    name: instruction audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: make -C src -j4 build ARCH=x86-64-avx COMP=gcc NOSTRIP=1
+      - run: tools/isa_audit.sh src/arcubate
