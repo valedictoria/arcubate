@@ -27,6 +27,7 @@
 #endif
 
 #include <windows.h>
+#include <malloc.h>
 // The needed Windows API for processor groups could be missed from old Windows
 // versions, so instead of calling them directly (forcing the linker to resolve
 // the calls at compile time), try to load them at runtime. To do this we need
@@ -340,7 +341,7 @@ void* std_aligned_alloc(size_t alignment, size_t size) {
   void *mem;
   return posix_memalign(&mem, alignment, size) ? nullptr : mem;
 #elif defined(_WIN32)
-  return _mm_malloc(size, alignment);
+  return _aligned_malloc(size, alignment); // Also available on Windows ARM
 #else
   return std::aligned_alloc(alignment, size);
 #endif
@@ -351,7 +352,7 @@ void std_aligned_free(void* ptr) {
 #if defined(POSIXALIGNEDALLOC)
   free(ptr);
 #elif defined(_WIN32)
-  _mm_free(ptr);
+  _aligned_free(ptr);
 #else
   free(ptr);
 #endif

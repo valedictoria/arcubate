@@ -202,9 +202,25 @@ The shipped engine, book and licence must total under 35 MB.
 ### What has actually been run
 
 Keep this honest and current. A kernel that has not run here is unverified.
+Results below are from CI run 41917614057 unless noted. Every listed level matched
+the bench signature on that platform.
 
-| Level | Status |
-|---|---|
-| `sse41`, `scalar` | Matched the signature on the i5-3230M |
-| `avx2`, `avx512`, `neon` | Compiled for x86 where applicable, but not yet run: the i5-3230M cannot execute them. CI is expected to cover them |
-| All eight release builds | Only Linux x64 and Linux AMD have been built and run so far |
+| Release | Levels that ran | Status |
+|---|---|---|
+| Linux x64 | `avx2`, `sse41`, `scalar` | Passed |
+| Linux AMD | `avx512`, `avx2`, `sse41`, `scalar` | Passed |
+| Linux ARM | `neon`, `scalar` | Passed |
+| macOS x64 | `avx2`, `sse41`, `scalar` | Passed |
+| macOS ARM | `neon`, `scalar` | Passed |
+| Windows x64 | `avx512`, `avx2`, `sse41`, `scalar` | Passed |
+| Windows AMD | `avx512`, `avx2`, `sse41`, `scalar` | Passed |
+| Windows ARM | None | Failed to compile: `_mm_malloc` is x86-only. Fix made, not yet confirmed by CI |
+
+The reference i5-3230M ran `sse41` and `scalar` on the Linux x64 build, and also
+fell back correctly when asked for `avx2` and `avx512`.
+
+Which levels run depends on the CPU of the runner assigned, so a level listed for
+one run may not run in another. The AMD builds also ran on whatever CPU the runner
+had, not necessarily an AMD one. Speeds from CI are too noisy to compare.
+
+Run 41917614057 skipped the CI book check, because `arcubate.book` was not yet in the repository.
