@@ -202,25 +202,24 @@ The shipped engine, book and licence must total under 35 MB.
 ### What has actually been run
 
 Keep this honest and current. A kernel that has not run here is unverified.
-Results below are from CI run 41917614057 unless noted. Every listed level matched
-the bench signature on that platform.
+Results are from CI run 41919672431 (commit `7154081`) unless noted. All eight
+builds passed, every listed level matched the bench signature, and each build
+played a book move.
 
-| Release | Levels that ran | Status |
-|---|---|---|
-| Linux x64 | `avx2`, `sse41`, `scalar` | Passed |
-| Linux AMD | `avx512`, `avx2`, `sse41`, `scalar` | Passed |
-| Linux ARM | `neon`, `scalar` | Passed |
-| macOS x64 | `avx2`, `sse41`, `scalar` | Passed |
-| macOS ARM | `neon`, `scalar` | Passed |
-| Windows x64 | `avx512`, `avx2`, `sse41`, `scalar` | Passed |
-| Windows AMD | `avx512`, `avx2`, `sse41`, `scalar` | Passed |
-| Windows ARM | None | Failed to compile: `_mm_malloc` is x86-only. Fix made, not yet confirmed by CI |
+| Release | Levels that ran |
+|---|---|
+| Linux x64 | `avx2`, `sse41`, `scalar` |
+| Linux AMD | `avx2`, `sse41`, `scalar` (`avx512` in run 41917614057) |
+| Linux ARM | `neon`, `scalar` |
+| macOS x64 | `avx2`, `sse41`, `scalar` |
+| macOS ARM | `neon`, `scalar` |
+| Windows x64 | `avx512`, `avx2`, `sse41`, `scalar` |
+| Windows AMD | `avx512`, `avx2`, `sse41`, `scalar` |
+| Windows ARM | `neon`, `scalar` |
 
 The reference i5-3230M ran `sse41` and `scalar` on the Linux x64 build, and also
 fell back correctly when asked for `avx2` and `avx512`.
 
 Which levels run depends on the CPU of the runner assigned, so a level listed for
-one run may not run in another. The AMD builds also ran on whatever CPU the runner
-had, not necessarily an AMD one. Speeds from CI are too noisy to compare.
-
-Run 41917614057 skipped the CI book check, because `arcubate.book` was not yet in the repository.
+one run may not run in another. The AMD builds ran on whatever CPU the runner had,
+not necessarily an AMD one. Speeds from CI are too noisy to compare.
