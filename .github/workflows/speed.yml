@@ -17,6 +17,7 @@ jobs:
     timeout-minutes: 120
     env:
       SIMD: sse41
+      BASE_TARGET: build
     steps:
       - uses: actions/checkout@v4
         with:
@@ -28,8 +29,8 @@ jobs:
       - run: sudo apt-get update -q && sudo apt-get install -yq valgrind
       - name: Build both
         run: |
-          make -C base/src -j4 build ARCH=x86-64-avx COMP=gcc > /dev/null
-          make -C test/src -j4 build ARCH=x86-64-avx COMP=gcc > /dev/null
+          make -C base/src -j4 $BASE_TARGET ARCH=x86-64-avx COMP=gcc > /dev/null
+          make -C test/src -j4 profile-build ARCH=x86-64-avx COMP=gcc > /dev/null
       - name: Signature of the change
         run: test/tools/check_bench.sh test/src/arcubate
       - name: Instructions per node, base

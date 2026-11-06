@@ -873,6 +873,11 @@ config-sanity:
 $(EXE): $(OBJS)
 	+$(CXX) -o $@ $(OBJS) $(LDFLAGS)
 
+# The kernels are built without profile data. A profile only exercises the SIMD
+# levels the build machine has, so the compiler would treat the other levels as
+# rarely used and optimize them for size.
+nnue_kernels.o: CXXFLAGS := $(filter-out -fprofile%,$(CXXFLAGS))
+
 clang-profile-make:
 	$(MAKE) ARCH=$(ARCH) COMP=$(COMP) \
 	EXTRACXXFLAGS='-fprofile-instr-generate ' \

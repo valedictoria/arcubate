@@ -20,7 +20,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
-      - run: make -C src -j4 build ARCH=${{ matrix.arch }} COMP=${{ matrix.comp }}
+      - run: make -C src -j4 profile-build ARCH=${{ matrix.arch }} COMP=${{ matrix.comp }}
       - name: Bench signature at every SIMD level
         run: tools/check_bench.sh src/arcubate
       - name: Book move
@@ -45,7 +45,7 @@ jobs:
         include:
           - { name: windows-x64, os: windows-latest, arch: x86-64-avx,     comp: mingw, msys: MINGW64,    pkg: mingw-w64-x86_64-gcc }
           - { name: windows-amd, os: windows-latest, arch: x86-64-avx-amd, comp: mingw, msys: MINGW64,    pkg: mingw-w64-x86_64-gcc }
-          - { name: windows-arm, os: windows-11-arm, arch: armv8,          comp: clang, msys: CLANGARM64, pkg: mingw-w64-clang-aarch64-clang }
+          - { name: windows-arm, os: windows-11-arm, arch: armv8,          comp: clang, msys: CLANGARM64, pkg: mingw-w64-clang-aarch64-clang mingw-w64-clang-aarch64-llvm }
     runs-on: ${{ matrix.os }}
     defaults:
       run:
@@ -56,7 +56,7 @@ jobs:
         with:
           msystem: ${{ matrix.msys }}
           install: make ${{ matrix.pkg }}
-      - run: make -C src -j4 build ARCH=${{ matrix.arch }} COMP=${{ matrix.comp }}
+      - run: make -C src -j4 profile-build ARCH=${{ matrix.arch }} COMP=${{ matrix.comp }}
       - name: Bench signature at every SIMD level
         run: tools/check_bench.sh src/arcubate
       - name: Book move
@@ -78,5 +78,5 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - run: make -C src -j4 build ARCH=x86-64-avx COMP=gcc NOSTRIP=1
+      - run: make -C src -j4 profile-build ARCH=x86-64-avx COMP=gcc NOSTRIP=1
       - run: tools/isa_audit.sh src/arcubate
