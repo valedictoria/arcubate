@@ -18,6 +18,9 @@ endgame knowledge and network evaluation are Stockfish 12's.
 | Defaults: `Threads` 2, `Hash` 64 | `src/ucioption.cpp` |
 | New options: `SIMD`, `OwnBook`, `BookFile`, `BookVariety`, `BookDepth` | `src/ucioption.cpp` |
 | Default build target `x86-64-avx`, plus `x86-64-avx-amd` | `src/Makefile` |
+| Accumulators update from the nearest computed position, not only the previous one | `src/nnue/nnue_feature_transformer.h`, `src/position.cpp` |
+| First hidden layer skips all-zero input groups | `src/nnue/nnue_kernels.*`, `src/nnue/layers/affine_transform.h` |
+| Network loaded in bulk | `src/nnue/nnue_common.h` |
 
 None of these change what the engine searches, except that the book can replace
 a search when the game clock is in charge. That is what makes the bench invariant
@@ -67,11 +70,12 @@ classical evaluation and its endgame knowledge are always present.
 The engine is one binary per CPU family. Everything outside the kernels is built
 for the baseline only, so a newer instruction cannot reach an older CPU by accident.
 
-There are five kernels, in `src/nnue/nnue_kernels.cpp`:
+There are six kernels, in `src/nnue/nnue_kernels.cpp`:
 
 | Kernel | Purpose |
 |---|---|
-| `affine` | Weighted sum of `u8` inputs and `s8` weights into `s32` outputs |
+| `sparse` | First hidden layer: the same sum as `affine`, skipping groups of 4 input bytes that are all zero. Its weights are reordered by input group at load |
+| `affine` | Weighted sum of `u8` inputs and `s8` weights into `s32` outputs, used by the second hidden layer |
 | `relu` | Shift `s32` right by 6 and clip to 0..127 as `u8` |
 | `add`, `sub` | Update a 256-wide `s16` accumulator |
 | `transform` | Clip the `s16` accumulator to 0..127 as `u8` |
@@ -87,7 +91,7 @@ There are five kernels, in `src/nnue/nnue_kernels.cpp`:
 | `scalar` | None | Any | Always available |
 
 `relu` and `transform` have no 512-bit version, so the `avx512` level uses their
-AVX2 versions. `relu` on ARM uses the scalar version.
+AVX2 versions.
 
 ### Selection and fallback
 
@@ -121,7 +125,10 @@ option changes.
    with wider instructions could be picked by the linker and crash older CPUs.
 3. Never add per-file flags like `-mavx2`, for the same reason.
 4. Use unaligned loads and stores, so an alignment bug cannot crash a kernel.
-5. Any new kernel needs a scalar version, and must match the bench signature.
+5. Any new kernel needs a version for every level, including `neon` and `scalar`, and
+   must match the bench signature.
+6. `nnue_kernels.cpp` is built without profile data. A profile only exercises the
+   levels the build machine has, so the compiler would treat the rest as rarely used.
 
 `maddubs` can saturate in general, but cannot here: inputs are at most 127 and
 weights fit in `s8`, so a pair sums to at most 32,512, below the `s16` limit of
@@ -132,14 +139,16 @@ above 127 would break it.
 
 | Release | Make target | Compiler | Instruction baseline | Best kernel |
 |---|---|---|---|---|
-| Linux x64 | `x86-64-avx` | gcc | AVX, Sandy Bridge | `avx512` |
-| Linux AMD | `x86-64-avx-amd` | gcc | Same, `-mtune=znver2` | `avx512` |
-| Linux ARM | `armv8` | gcc | ARMv8 with NEON | `neon` |
+| Linux x64 | `x86-64-avx` | clang | AVX, Sandy Bridge | `avx512` |
+| Linux AMD | `x86-64-avx-amd` | clang | Same, `-mtune=znver2` | `avx512` |
+| Linux ARM | `armv8` | clang | ARMv8 with NEON | `neon` |
 | macOS x64 | `x86-64-avx` | clang | AVX, Sandy Bridge | `avx512` |
 | macOS ARM | `apple-silicon` | clang | Apple Silicon with NEON | `neon` |
-| Windows x64 | `x86-64-avx` | mingw | AVX, Sandy Bridge | `avx512` |
-| Windows AMD | `x86-64-avx-amd` | mingw | Same, `-mtune=znver2` | `avx512` |
+| Windows x64 | `x86-64-avx` | clang | AVX, Sandy Bridge | `avx512` |
+| Windows AMD | `x86-64-avx-amd` | clang | Same, `-mtune=znver2` | `avx512` |
 | Windows ARM | `armv8` | clang | ARMv8 with NEON | `neon` |
+
+Every release uses a profile-guided `clang` build (`make profile-build`).
 
 "AMD" means tuned for Zen, not a different instruction set: AMD and Intel run the
 same x86-64 code, and the AMD builds use the same kernels. The bench signature
@@ -196,30 +205,43 @@ The shipped engine, book and licence must total under 35 MB.
 | Check | Command | What it proves |
 |---|---|---|
 | Bench | `tools/check_bench.sh src/arcubate` | Invariants 1 and 2 at every level this CPU supports |
-| Instructions | `tools/isa_audit.sh` | Only kernels and guarded C library routines use newer instructions |
+| Instructions | `tools/isa_audit.sh` | Only kernels and guarded C library routines use newer instructions. `tzcnt` is allowed: it is `rep bsf`, which older CPUs run as `bsf` |
+| Speed | `tools/nps.sh base test` | Alternating runs on one core. Judge speed changes on the reference laptop |
+| Instruction count | `tools/instructions.sh` | Instructions per node, unaffected by machine load, but blind to cache and branch costs |
+| Hot spots | `tools/hotspots.sh` | Instructions per function |
 | Move generation | `go perft 6` from the start position | 119,060,324 nodes |
 
 ### What has actually been run
 
 Keep this honest and current. A kernel that has not run here is unverified.
-Results are from CI run 41919672431 (commit `7154081`) unless noted. All eight
-builds passed, every listed level matched the bench signature, and each build
-played a book move.
+CI runs on `opt/` branches compare a change with `main` (`.github/workflows/speed.yml`).
 
-| Release | Levels that ran |
-|---|---|
-| Linux x64 | `avx2`, `sse41`, `scalar` |
-| Linux AMD | `avx2`, `sse41`, `scalar` (`avx512` in run 41917614057) |
-| Linux ARM | `neon`, `scalar` |
-| macOS x64 | `avx2`, `sse41`, `scalar` |
-| macOS ARM | `neon`, `scalar` |
-| Windows x64 | `avx512`, `avx2`, `sse41`, `scalar` |
-| Windows AMD | `avx512`, `avx2`, `sse41`, `scalar` |
-| Windows ARM | `neon`, `scalar` |
+CI run 42277144230 (branch `opt/sparse-affine`, merged unchanged): all eight builds
+passed, and every level that ran matched the bench signature and perft. Which levels
+run depends on the runner's CPU, and the AMD builds ran on whatever CPU was assigned.
 
-The reference i5-3230M ran `sse41` and `scalar` on the Linux x64 build, and also
-fell back correctly when asked for `avx2` and `avx512`.
+### Measured speed
 
-Which levels run depends on the CPU of the runner assigned, so a level listed for
-one run may not run in another. The AMD builds ran on whatever CPU the runner had,
-not necessarily an AMD one. Speeds from CI are too noisy to compare.
+Instructions per node at the `sse41` level, from CI:
+
+| Step | Mixed | Network only | Classical only |
+|---|---|---|---|
+| Start | 5,066 | 8,000 | 2,959 |
+| Accumulator copy removed | 5,062 | 7,985 | 2,962 |
+| Profile-guided build | 4,817 | 7,736 | 2,721 |
+| `clang` | 3,784 | 5,457 | 2,602 |
+| Update from nearest position | 3,608 | 5,081 | 2,595 |
+| Skip zero input groups | 3,250 | 4,221 | 2,595 |
+
+Startup fell from 2,149M to 678M instructions with bulk network loading.
+
+Fewer instructions does not always mean faster. Skipping zero groups cut instructions
+by 17% but showed no gain on the CI runner, so CI speed cannot judge a change like this.
+
+Reference laptop, one core, `sse41`, CI-built binaries, desktop apps running. These runs
+are noisy: a sensor reached 93 C, and classical speed moved by about 30% between runs.
+
+| Comparison | Mixed | Network only | Classical only |
+|---|---|---|---|
+| Original `gcc` build vs `main` before zero-group skipping (3 runs) | +7.5% | +13.9% | -3.6% |
+| Before vs after zero-group skipping (5 runs) | +8.4% | +3.4% | +0.1% |
