@@ -249,6 +249,20 @@ namespace {
     }
   }
 
+  void relu_neon(const std::int32_t* input, std::uint8_t* output, std::uint32_t count) {
+    const int8x16_t zero = vdupq_n_s8(0);
+    std::uint32_t i = 0;
+    for ( ; i + 16 <= count; i += 16)
+    {
+        int16x8_t w0 = vcombine_s16(vqshrn_n_s32(vld1q_s32(input + i), WeightScaleBits),
+                                    vqshrn_n_s32(vld1q_s32(input + i + 4), WeightScaleBits));
+        int16x8_t w1 = vcombine_s16(vqshrn_n_s32(vld1q_s32(input + i + 8), WeightScaleBits),
+                                    vqshrn_n_s32(vld1q_s32(input + i + 12), WeightScaleBits));
+        vst1q_u8(output + i, vreinterpretq_u8_s8(vmaxq_s8(vcombine_s8(vqmovn_s16(w0), vqmovn_s16(w1)), zero)));
+    }
+    relu_scalar(input + i, output + i, count - i);
+  }
+
   void add_neon(std::int16_t* a, const std::int16_t* c, std::uint32_t count) {
     for (std::uint32_t i = 0; i < count; i += 8)
         vst1q_s16(a + i, vaddq_s16(vld1q_s16(a + i), vld1q_s16(c + i)));
@@ -274,7 +288,7 @@ namespace {
   const Table AVX2   = { "avx2",   affine_avx2,   relu_avx2,   add_avx2,   sub_avx2,   transform_avx2 };
   const Table AVX512 = { "avx512", affine_avx512, relu_avx2,   add_avx512, sub_avx512, transform_avx2 };
 #elif defined(ARCUBATE_NEON)
-  const Table NEON   = { "neon",   affine_neon,   relu_scalar, add_neon,   sub_neon,   transform_neon };
+  const Table NEON   = { "neon",   affine_neon,   relu_neon,   add_neon,   sub_neon,   transform_neon };
 #endif
 
 } // namespace

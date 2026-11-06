@@ -112,7 +112,7 @@ namespace Eval::NNUE {
 
     // Calculate cumulative value using difference calculation
     void UpdateAccumulator(const Position& pos) const {
-      const auto prev_accumulator = pos.state()->previous->accumulator;
+      const auto& prev_accumulator = pos.state()->previous->accumulator;
       auto& accumulator = pos.state()->accumulator;
       IndexType i = 0;
       Features::IndexList removed_indices[2], added_indices[2];

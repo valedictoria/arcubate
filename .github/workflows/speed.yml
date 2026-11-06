@@ -1,0 +1,40 @@
+# Compares a change with main at the reference machine's SIMD level. Runner speed
+# varies, so judge by instructions per node first and treat NPS as a guide. Final
+# figures still come from tools/nps.sh on the reference laptop.
+name: speed
+on:
+  push:
+    branches: ['opt/**']
+  workflow_dispatch:
+    inputs:
+      base:
+        description: Ref to compare against
+        default: main
+
+jobs:
+  compare:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    env:
+      SIMD: sse41
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: test
+      - uses: actions/checkout@v4
+        with:
+          path: base
+          ref: ${{ inputs.base || 'main' }}
+      - run: sudo apt-get update -q && sudo apt-get install -yq valgrind
+      - name: Build both
+        run: |
+          make -C base/src -j4 build ARCH=x86-64-avx COMP=gcc > /dev/null
+          make -C test/src -j4 build ARCH=x86-64-avx COMP=gcc > /dev/null
+      - name: Signature of the change
+        run: test/tools/check_bench.sh test/src/arcubate
+      - name: Instructions per node, base
+        run: test/tools/instructions.sh base/src/arcubate
+      - name: Instructions per node, test
+        run: test/tools/instructions.sh test/src/arcubate
+      - name: NPS, alternating runs
+        run: test/tools/nps.sh base/src/arcubate test/src/arcubate 7 1
