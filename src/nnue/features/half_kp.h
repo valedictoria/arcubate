@@ -49,8 +49,8 @@ namespace Eval::NNUE::Features {
     static void AppendActiveIndices(const Position& pos, Color perspective,
                                     IndexList* active);
 
-    // Get a list of indices for recently changed features
-    static void AppendChangedIndices(const Position& pos, Color perspective,
+    // Get a list of indices for the changes made by one move
+    static void AppendChangedIndices(const Position& pos, const DirtyPiece& dp, Color perspective,
                                      IndexList* removed, IndexList* added);
 
    private:

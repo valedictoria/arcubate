@@ -987,6 +987,8 @@ void Position::do_null_move(StateInfo& newSt) {
   {
       std::memcpy(&newSt, st, sizeof(StateInfo));
       st->accumulator.computed_score = false;
+      newSt.dirtyPiece.dirty_num = 0;     // A null move changes no pieces, so the
+      newSt.dirtyPiece.piece[0] = NO_PIECE; // accumulator update must not repeat these
   }
   else
       std::memcpy(&newSt, st, offsetof(StateInfo, accumulator));

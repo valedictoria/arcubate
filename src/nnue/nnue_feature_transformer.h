@@ -63,18 +63,20 @@ namespace Eval::NNUE {
       return !stream.fail();
     }
 
-    // Proceed with the difference calculation if possible
+    // Bring the accumulator up to date from the nearest earlier position that has
+    // one, if applying the changes since then is cheaper than a full refresh. Search
+    // often skips evaluating a node, so that position may be several plies back.
     bool UpdateAccumulatorIfPossible(const Position& pos) const {
-      const auto now = pos.state();
-      if (now->accumulator.computed_accumulation) {
-        return true;
+      const StateInfo* st = pos.state();
+      int budget = pos.count<ALL_PIECES>() - 2;
+      while (!st->accumulator.computed_accumulation) {
+        if (!st->previous || (budget -= st->dirtyPiece.dirty_num + 1) < 0)
+          return false;
+        st = st->previous;
       }
-      const auto prev = now->previous;
-      if (prev && prev->accumulator.computed_accumulation) {
-        UpdateAccumulator(pos);
-        return true;
-      }
-      return false;
+      if (st != pos.state())
+        UpdateAccumulator(pos, st);
+      return true;
     }
 
     // Convert input features
@@ -110,28 +112,33 @@ namespace Eval::NNUE {
       accumulator.computed_score = false;
     }
 
-    // Calculate cumulative value using difference calculation
-    void UpdateAccumulator(const Position& pos) const {
-      const auto& prev_accumulator = pos.state()->previous->accumulator;
+    // Calculate cumulative value from an earlier position's accumulator. The budget
+    // in UpdateAccumulatorIfPossible keeps the changes within the index list capacity.
+    void UpdateAccumulator(const Position& pos, const StateInfo* base) const {
       auto& accumulator = pos.state()->accumulator;
       IndexType i = 0;
-      Features::IndexList removed_indices[2], added_indices[2];
-      bool reset[2];
-      RawFeatures::AppendChangedIndices(pos, kRefreshTriggers[i],
-                                        removed_indices, added_indices, reset);
       for (Color perspective : { WHITE, BLACK }) {
-        if (reset[perspective]) {
+        Features::IndexList removed, added;
+        bool reset = false;
+        for (const StateInfo* st = pos.state(); st != base; st = st->previous)
+          reset |= st->dirtyPiece.piece[0] == make_piece(perspective, KING);
+
+        if (reset) {
           std::memcpy(accumulator.accumulation[perspective][i], biases_,
                       kHalfDimensions * sizeof(BiasType));
+          RawFeatures::CollectActiveIndices(pos, kRefreshTriggers[i], perspective, &added);
         } else {
           std::memcpy(accumulator.accumulation[perspective][i],
-                      prev_accumulator.accumulation[perspective][i],
+                      base->accumulator.accumulation[perspective][i],
                       kHalfDimensions * sizeof(BiasType));
-          for (const auto index : removed_indices[perspective])
+          for (const StateInfo* st = pos.state(); st != base; st = st->previous)
+            RawFeatures::CollectChangedIndices(pos, st->dirtyPiece, kRefreshTriggers[i],
+                                               perspective, &removed, &added);
+          for (const auto index : removed)
             Kernels::active.sub(accumulator.accumulation[perspective][i],
                                 &weights_[kHalfDimensions * index], kHalfDimensions);
         }
-        for (const auto index : added_indices[perspective])
+        for (const auto index : added)
           Kernels::active.add(accumulator.accumulation[perspective][i],
                               &weights_[kHalfDimensions * index], kHalfDimensions);
       }

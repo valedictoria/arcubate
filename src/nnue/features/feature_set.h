@@ -54,36 +54,6 @@ namespace Eval::NNUE::Features {
             pos, trigger, perspective, &active[perspective]);
       }
     }
-
-    // Get a list of indices for recently changed features
-    template <typename PositionType, typename IndexListType>
-    static void AppendChangedIndices(
-        const PositionType& pos, TriggerEvent trigger,
-        IndexListType removed[2], IndexListType added[2], bool reset[2]) {
-
-      const auto& dp = pos.state()->dirtyPiece;
-      if (dp.dirty_num == 0) return;
-
-      for (Color perspective : { WHITE, BLACK }) {
-        reset[perspective] = false;
-        switch (trigger) {
-          case TriggerEvent::kFriendKingMoved:
-            reset[perspective] = dp.piece[0] == make_piece(perspective, KING);
-            break;
-          default:
-            assert(false);
-            break;
-        }
-        if (reset[perspective]) {
-          Derived::CollectActiveIndices(
-              pos, trigger, perspective, &added[perspective]);
-        } else {
-          Derived::CollectChangedIndices(
-              pos, trigger, perspective,
-              &removed[perspective], &added[perspective]);
-        }
-      }
-    }
   };
 
   // Class template that represents the feature set
@@ -103,7 +73,6 @@ namespace Eval::NNUE::Features {
         CompileTimeList<TriggerEvent, FeatureType::kRefreshTrigger>;
     static constexpr auto kRefreshTriggers = SortedTriggerSet::kValues;
 
-   private:
     // Get a list of indices for active features
     static void CollectActiveIndices(
         const Position& pos, const TriggerEvent trigger, const Color perspective,
@@ -113,13 +82,13 @@ namespace Eval::NNUE::Features {
       }
     }
 
-    // Get a list of indices for recently changed features
+    // Get a list of indices for the changes made by one move
     static void CollectChangedIndices(
-        const Position& pos, const TriggerEvent trigger, const Color perspective,
-        IndexList* const removed, IndexList* const added) {
+        const Position& pos, const DirtyPiece& dp, const TriggerEvent trigger,
+        const Color perspective, IndexList* const removed, IndexList* const added) {
 
       if (FeatureType::kRefreshTrigger == trigger) {
-        FeatureType::AppendChangedIndices(pos, perspective, removed, added);
+        FeatureType::AppendChangedIndices(pos, dp, perspective, removed, added);
       }
     }
 
