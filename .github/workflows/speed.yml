@@ -17,7 +17,7 @@ jobs:
     timeout-minutes: 120
     env:
       SIMD: sse41
-      BASE_COMP: gcc
+      BASE_COMP: clang
     steps:
       - uses: actions/checkout@v4
         with:
