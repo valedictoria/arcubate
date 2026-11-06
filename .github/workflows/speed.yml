@@ -30,12 +30,16 @@ jobs:
       - name: Build both
         run: |
           make -C base/src -j4 profile-build ARCH=x86-64-avx COMP=$BASE_COMP > /dev/null
-          make -C test/src -j4 profile-build ARCH=x86-64-avx COMP=clang > /dev/null
+          make -C test/src -j4 profile-build ARCH=x86-64-avx COMP=clang NOSTRIP=1 > /dev/null
       - name: Signature of the change
         run: test/tools/check_bench.sh test/src/arcubate
       - name: Instructions per node, base
         run: test/tools/instructions.sh base/src/arcubate
       - name: Instructions per node, test
         run: test/tools/instructions.sh test/src/arcubate
+      - name: Where the instructions go, network
+        run: test/tools/hotspots.sh test/src/arcubate NNUE
+      - name: Where the instructions go, classical
+        run: test/tools/hotspots.sh test/src/arcubate classical
       - name: NPS, alternating runs
         run: test/tools/nps.sh base/src/arcubate test/src/arcubate 7 1
