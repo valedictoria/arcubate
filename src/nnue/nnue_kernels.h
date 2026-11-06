@@ -15,8 +15,14 @@
 
 namespace Eval::NNUE::Kernels {
 
+  // The first hidden layer has this many outputs. Its weights are stored by input
+  // group: 4 weights per output for each group of 4 input bytes.
+  constexpr std::uint32_t SparseOutputs = 32;
+
   struct Table {
     const char* name;
+    void (*sparse)(const std::uint8_t* input, const std::int8_t* columns, const std::int32_t* biases,
+                   std::uint32_t paddedInputs, std::int32_t* output);
     void (*affine)(const std::uint8_t* input, const std::int8_t* weights, const std::int32_t* biases,
                    std::uint32_t paddedInputs, std::uint32_t outputs, std::int32_t* output);
     void (*relu)(const std::int32_t* input, std::uint8_t* output, std::uint32_t count);

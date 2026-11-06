@@ -22,6 +22,7 @@
 #define NNUE_LAYERS_AFFINE_TRANSFORM_H_INCLUDED
 
 #include <iostream>
+#include <vector>
 #include "../nnue_common.h"
 #include "../nnue_kernels.h"
 
@@ -42,6 +43,10 @@ namespace Eval::NNUE::Layers {
     static constexpr IndexType kOutputDimensions = OutputDimensions;
     static constexpr IndexType kPaddedInputDimensions =
         CeilToMultiple<IndexType>(kInputDimensions, kMaxSimdWidth);
+
+    // The layer fed by the feature transformer has mostly zero inputs
+    static constexpr bool kSparse = kInputDimensions == 512;
+    static_assert(!kSparse || kOutputDimensions == Kernels::SparseOutputs, "");
 
     // Size of forward propagation buffer used in this layer
     static constexpr std::size_t kSelfBufferSize =
@@ -65,6 +70,15 @@ namespace Eval::NNUE::Layers {
       if (!previous_layer_.ReadParameters(stream)) return false;
       read_little_endian<BiasType>(stream, biases_, kOutputDimensions);
       read_little_endian<WeightType>(stream, weights_, kOutputDimensions * kPaddedInputDimensions);
+
+      // Reorder the first layer's weights by input group for the sparse kernel
+      if constexpr (kSparse) {
+        std::vector<WeightType> rows(weights_, weights_ + kOutputDimensions * kPaddedInputDimensions);
+        for (IndexType g = 0; g < kPaddedInputDimensions / 4; ++g)
+          for (IndexType o = 0; o < kOutputDimensions; ++o)
+            for (IndexType b = 0; b < 4; ++b)
+              weights_[g * kOutputDimensions * 4 + o * 4 + b] = rows[o * kPaddedInputDimensions + g * 4 + b];
+      }
       return !stream.fail();
     }
 
@@ -75,7 +89,10 @@ namespace Eval::NNUE::Layers {
           transformed_features, buffer + kSelfBufferSize);
       const auto output = reinterpret_cast<OutputType*>(buffer);
 
-      Kernels::active.affine(input, weights_, biases_, kPaddedInputDimensions, kOutputDimensions, output);
+      if constexpr (kSparse)
+        Kernels::active.sparse(input, weights_, biases_, kPaddedInputDimensions, output);
+      else
+        Kernels::active.affine(input, weights_, biases_, kPaddedInputDimensions, kOutputDimensions, output);
       return output;
     }
 
