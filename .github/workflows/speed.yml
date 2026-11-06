@@ -17,7 +17,7 @@ jobs:
     timeout-minutes: 120
     env:
       SIMD: sse41
-      BASE_TARGET: profile-build
+      BASE_COMP: gcc
     steps:
       - uses: actions/checkout@v4
         with:
@@ -26,11 +26,11 @@ jobs:
         with:
           path: base
           ref: ${{ inputs.base || 'main' }}
-      - run: sudo apt-get update -q && sudo apt-get install -yq valgrind
+      - run: sudo apt-get update -q && sudo apt-get install -yq valgrind clang lld llvm
       - name: Build both
         run: |
-          make -C base/src -j4 $BASE_TARGET ARCH=x86-64-avx COMP=gcc > /dev/null
-          make -C test/src -j4 profile-build ARCH=x86-64-avx COMP=gcc > /dev/null
+          make -C base/src -j4 profile-build ARCH=x86-64-avx COMP=$BASE_COMP > /dev/null
+          make -C test/src -j4 profile-build ARCH=x86-64-avx COMP=clang > /dev/null
       - name: Signature of the change
         run: test/tools/check_bench.sh test/src/arcubate
       - name: Instructions per node, base

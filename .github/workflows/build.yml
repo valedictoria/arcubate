@@ -12,14 +12,16 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { name: linux-x64, os: ubuntu-latest,    arch: x86-64-avx,     comp: gcc }
-          - { name: linux-amd, os: ubuntu-latest,    arch: x86-64-avx-amd, comp: gcc }
-          - { name: linux-arm, os: ubuntu-24.04-arm, arch: armv8,          comp: gcc }
+          - { name: linux-x64, os: ubuntu-latest,    arch: x86-64-avx,     comp: clang }
+          - { name: linux-amd, os: ubuntu-latest,    arch: x86-64-avx-amd, comp: clang }
+          - { name: linux-arm, os: ubuntu-24.04-arm, arch: armv8,          comp: clang }
           - { name: macos-x64, os: macos-15-intel,   arch: x86-64-avx,     comp: clang }
           - { name: macos-arm, os: macos-latest,     arch: apple-silicon,  comp: clang }
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
+      - if: runner.os == 'Linux'
+        run: sudo apt-get update -q && sudo apt-get install -yq clang lld llvm
       - run: make -C src -j4 profile-build ARCH=${{ matrix.arch }} COMP=${{ matrix.comp }}
       - name: Bench signature at every SIMD level
         run: tools/check_bench.sh src/arcubate
@@ -43,8 +45,8 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { name: windows-x64, os: windows-latest, arch: x86-64-avx,     comp: mingw, msys: MINGW64,    pkg: mingw-w64-x86_64-gcc }
-          - { name: windows-amd, os: windows-latest, arch: x86-64-avx-amd, comp: mingw, msys: MINGW64,    pkg: mingw-w64-x86_64-gcc }
+          - { name: windows-x64, os: windows-latest, arch: x86-64-avx,     comp: clang, msys: CLANG64,    pkg: mingw-w64-clang-x86_64-clang mingw-w64-clang-x86_64-llvm }
+          - { name: windows-amd, os: windows-latest, arch: x86-64-avx-amd, comp: clang, msys: CLANG64,    pkg: mingw-w64-clang-x86_64-clang mingw-w64-clang-x86_64-llvm }
           - { name: windows-arm, os: windows-11-arm, arch: armv8,          comp: clang, msys: CLANGARM64, pkg: mingw-w64-clang-aarch64-clang mingw-w64-clang-aarch64-llvm }
     runs-on: ${{ matrix.os }}
     defaults:
@@ -78,5 +80,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - run: make -C src -j4 profile-build ARCH=x86-64-avx COMP=gcc NOSTRIP=1
+      - run: sudo apt-get update -q && sudo apt-get install -yq clang lld llvm
+      - run: make -C src -j4 profile-build ARCH=x86-64-avx COMP=clang NOSTRIP=1
       - run: tools/isa_audit.sh src/arcubate
