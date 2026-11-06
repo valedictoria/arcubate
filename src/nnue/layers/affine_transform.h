@@ -63,10 +63,8 @@ namespace Eval::NNUE::Layers {
    // Read network parameters
     bool ReadParameters(std::istream& stream) {
       if (!previous_layer_.ReadParameters(stream)) return false;
-      for (std::size_t i = 0; i < kOutputDimensions; ++i)
-        biases_[i] = read_little_endian<BiasType>(stream);
-      for (std::size_t i = 0; i < kOutputDimensions * kPaddedInputDimensions; ++i)
-        weights_[i] = read_little_endian<WeightType>(stream);
+      read_little_endian<BiasType>(stream, biases_, kOutputDimensions);
+      read_little_endian<WeightType>(stream, weights_, kOutputDimensions * kPaddedInputDimensions);
       return !stream.fail();
     }
 

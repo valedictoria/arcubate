@@ -16,5 +16,5 @@ for type in mixed NNUE classical; do
   read -r i1 n1 < <(measure $type 1)
   read -r i2 n2 < <(measure $type "$depth")
   awk -v t=$type -v a="$i1" -v b="$n1" -v c="$i2" -v d="$n2" \
-    'BEGIN{printf "%-10s %10.0f instructions/node over %d nodes\n", t, (c-a)/(d-b), d-b}'
+    'BEGIN{printf "%-10s %10.0f instructions/node over %d nodes, startup %.0fM\n", t, (c-a)/(d-b), d-b, a/1e6}'
 done

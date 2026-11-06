@@ -143,6 +143,19 @@ namespace Eval::NNUE {
       return result;
   }
 
+  // read_little_endian() for a whole array. All supported platforms are little-endian,
+  // so the file's bytes can be used directly, which makes startup much faster.
+  template <typename IntType>
+  inline void read_little_endian(std::istream& stream, IntType* out, std::size_t count) {
+
+  #if defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
+      stream.read(reinterpret_cast<char*>(out), std::streamsize(count * sizeof(IntType)));
+  #else
+      for (std::size_t i = 0; i < count; ++i)
+          out[i] = read_little_endian<IntType>(stream);
+  #endif
+  }
+
 }  // namespace Eval::NNUE
 
 #endif // #ifndef NNUE_COMMON_H_INCLUDED
